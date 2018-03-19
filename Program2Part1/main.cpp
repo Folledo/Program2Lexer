@@ -5,19 +5,12 @@
 #include <map>
 #include <vector>
 #include <cctype>
+#include <iterator>
+#include <utility>
+//#include <projlex.h>
 using namespace std;
 
-vector<string>operatorsVec {":", "+", "-", "*", "/", "%" , "="};
-
-char *keywords[] = {"start", "finish", "then", "if", "repeat", "var",
-    "int", "float", "do", "read", "print", "void", "return", "dummy", "program"};
-char *identifiers[100]; //name of variables etc.
-char comments[] = {"\n"};
-char *relationalOperators[] = {"==", "<", ">", "=!=", "=>", "=<"};
-
-char otherOperators[] = {':', '+', '-', '*', '/', '%' , '='};
-
-char delimiters[] = {'.', '(', ')', ',', '{', '}', ';', '[', ']'};
+string keywords[] = {"char","string","int","double","float","include","start", "finish", "then", "if", "repeat", "var", "while", "string", "switch", "case", "int", "float", "do", "read", "print", "void", "return", "cout", "cin","using","namespace", "program"};
 
 enum TType{
     UNKNOWN,
@@ -71,12 +64,10 @@ public:
 
 bool isV=false, isMCI=false, isSUM=false;
 
-typedef enum { unknown, wordish, spaceish } wordmode_t;
-
 int main( int argc, char *argv[] )
 {
     
-    TType type;
+    multimap<int, string> tokenMap;
     
     for( int n=1; n<argc; n++ )
     {
@@ -101,92 +92,124 @@ int main( int argc, char *argv[] )
     
     
     int nCharsIn = 0, nLinesIn = 0, nToken = 0;
-    //char c='\0';
-    TType tokenType = UNKNOWN;
     string line;
-    
-    string wordstuff="", spacestuff="";
-    bool isKeyword = true, isIdentifier = true, isConstant = true, isOperator = true, isError = true, isDone = true;
-    int nKeyword = 0, nIdentifier = 0, nConstant = 0, nOperator = 0, nError = 0, nDone = 0;
-    
-    //string   line;
     while(getline(file,line))
     {
+        nCharsIn += line.size();
         nLinesIn++;
-        
         //I need to give linestream an actual token by itself################
         stringstream lineStream(line);
-        string sToken = line;
         int tokenLine = nLinesIn;
-        bool inOperators = false;
-        
-        int tokenLength = sToken.size();
-        string theToken = "";
         char ch;
-        //for (int i = 0; i < tokenLength; i++)
+        //while(lineStream.get(ch)){nCharsIn++;}//get the number of chars
         while(lineStream.get(ch))
         {
-            nCharsIn++;
-            //char c = sToken[i], c1, c2;
-            //c1 = line.peek();
-            if (ch == '<')
-            {
+            string currentToken = "";
+            
+//keyword or identifiers
+            if (isalpha(ch)){
                 char c = lineStream.peek();
+                currentToken+=ch;
+                while (isalnum(c)) {
+                    lineStream.get(c);
+                    currentToken+=c;
+                    c = lineStream.peek();
+                }//now we have a token
                 
-                switch(c)
-                {
-                    case '<':
-                        cout<<"There is 2 << in line: "<<nLinesIn<<endl;
-                        theToken+=ch;
-                        theToken+=c;
-                        nToken++;
-                        lineStream.get(c);//moves the pointer to ignore c
-                        
-                        break;
-                    case ' ':
-                        cout<<"There is only one < in line: "<<nLinesIn<<endl;
-                        nToken++;
-                        lineStream.get(c);
-                    default:
-                        nToken++;
-                        //cout<<"default\n";
-                        break;
+                bool isKeyword = false;
+                for (int i = 0; i < 28; i++){//less than keywords array
+                    string currentString = keywords[i];
+                    if (currentToken == currentString){
+                        isKeyword = true;
+                        currentToken.insert(0,"Keyword:               ");
+                    }
                 }
                 
+                if (isKeyword == false){ currentToken.insert(0,"Identifier:            ");}
+                
+                nToken++;
+                tokenMap.insert(make_pair(tokenLine,currentToken));
+                currentToken = "";
             }
-            //cout<<c;
-          // while(sToken.peek()=='<'){sToken.ignore(1,'<');}
-        }
-        cout<<theToken<<" in line#"<<nLinesIn<<endl;
-        
-        /*
-        while(lineStream >> sToken)//grabs each tokens separated by lines
-        {
-            nToken++;
+
+//operators, relations, and delimiters
+            if (ispunct(ch)){
+                currentToken+=ch;
+                char c = lineStream.peek();
+                char dh = '\0';
+                string toInsert = "";
+
+                if (ch == '+'){
+                    toInsert = "PLUS Operator:         ";
+                    if (c == '+'){ lineStream.get(c); currentToken+=c; toInsert = "PlusPlus Operator:     ";}
+                } else if (ch == '-'){
+                    toInsert = "MINUS Operator:        ";
+                    if (c == '-'){ lineStream.get(c); currentToken+=c; toInsert = "MinusMinus Operator:   ";}
+                } else if (ch == '*'){ toInsert = "MULTIPLY Operator:     ";
+                } else if (ch == '/'){
+                    toInsert = "DIVIDE Operator:       ";
+                    if (c == '/'){ toInsert = "COMMENT:               ";}
+                } else if (ch == '='){
+                    toInsert = "EQUAL Operator:        ";
+                    if (c == '='){lineStream.get(c); currentToken+=c; toInsert = "EqualEqual Operator:   ";}
+                } else if (ch == '"') {
+                    toInsert = "String:                ";
+                    while (dh != '"') { lineStream.get(dh); currentToken+=dh; }
+                } else if (ch == '<') {
+                    toInsert = "LessThan Operator:     ";
+                    if (c == '<'){
+                        toInsert = "Relational Operator:   ";
+                        currentToken+=c;
+                        lineStream.get(c);//moves the pointer to ignore c
+                    }
+                } else if (ch == '#'){ toInsert = "COMMENT:               ";
+                } else if (ch == ';'){ toInsert = "Semicolon Delimiter:   ";
+                } else if (ch == ','){ toInsert = "Comma Delimiter:       ";
+                } else if (ch == ':'){ toInsert = "Colon Delimiter:       ";
+                } else if (ch == '['){ toInsert = "LSQ:                   ";
+                } else if (ch == ']'){ toInsert = "RSQ:                   ";
+                } else if (ch == '('){ toInsert = "LPAREN:                ";
+                } else if (ch == ')'){ toInsert = "RPAREN:                ";
+                } else if (ch == '{'){ toInsert = "LCurly Delimiter:      ";
+                } else if (ch == '}'){ toInsert = "RCurly Delimiter:      ";
+                } else { toInsert = "Symbol:                ";
+                }
+                
+                currentToken.insert(0,toInsert);
+                nToken++;
+                tokenMap.insert(make_pair(tokenLine,currentToken));
+            }//end of ispunct
             
-            string currentToken = sToken;
-            if (find(operatorsVec.begin(), operatorsVec.end(), currentToken) != operatorsVec.end()) //if currentToken is find from operatorsVec
-            {
-                inOperators = true;
+            
+            
+//digit tokens
+            if (isdigit(ch)){
+                currentToken+="Digit:                 ";
+                char c = lineStream.peek();
+                currentToken+=ch;
+                while (isdigit(c)) {
+                    lineStream.get(c);
+                    currentToken+=c;
+                    c = lineStream.peek();
+                }
+                nToken++;
+                tokenMap.insert(make_pair(tokenLine,currentToken));
+                currentToken = "";
             }
             
             
-            
-            if (inOperators == true){cout<<"An operator token = ";}
-            cout << "Token( " << currentToken<< " )\n";
-            //cout<<" in line "<<tokenLine<<"\n";
-            
-            
-        }//end of while(lineStream >> sToken)
-        cout << "New Line Detected\n";
-         */
-        
+        }//end of while getChar
     }//end of while getline
     
     cout<<"========RESULTS========\n";
     cout<<"There are "<<nCharsIn<<" characters"<<endl;
     cout<<"There are "<<nLinesIn<<" lines"<<endl;
     cout<<"There are "<<nToken<<" tokens"<<endl;
-
+    cout<<"\n========TOKEN RESULTS========\n";
+    for (auto it = tokenMap.begin(); it != tokenMap.end(); it++)
+    {
+        cout<<it->second<<" in line# "<<it->first<<endl;
+    }
+    
     return 0;
 }
